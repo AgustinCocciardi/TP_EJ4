@@ -90,7 +90,7 @@ int main(int argc, char* argv[]){
                 FILE* archivo = fopen("procesos.txt","r");
                 if (archivo == NULL)
                 {
-                    printf("\nSe ha producido un error\n");
+                    printf("\nNo se pudo extraer información de los Procesos en ejecucion\n");
                     exit(1);
                 }
                 char delimitador[]=" \n";
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]){
                 strftime(hora, 100, "%H:%M:%S", tm);
 
                 int amb=0;
-                int cpu=0;
+                int cpuArr=0;
                 int mem=0;
                 int corte;
 
@@ -143,6 +143,7 @@ int main(int argc, char* argv[]){
                         {
                             //printf("\nUser: %s PID: %s CPU: %s Memoria: %s Nombre: %s", user, pid, cpuUso, memUso, command);
                             corte=1;
+                            amb=0;
                             while (strcmp(excedenAmbos[amb]," ") != 0 && corte == 1)
                             {
                                 if (strcmp(excedenAmbos[amb],pid) == 0)
@@ -165,6 +166,7 @@ int main(int argc, char* argv[]){
                                 strcat(buffer," ");
                                 strcat(buffer,hora);
                                 strcat(buffer,"\n");
+                                strcpy(excedenAmbos[amb+1]," ");
                             }
                         }
                         else
@@ -172,20 +174,21 @@ int main(int argc, char* argv[]){
                             if (cpuInput > cpu)
                             {
                                 corte=1;
-                                while (strcmp(excedenCPU[cpu]," ") != 0 && corte == 1)
+                                cpuArr=0;
+                                while (strcmp(excedenCPU[cpuArr]," ") != 0 && corte == 1)
                                 {
-                                    if (strcmp(excedenCPU[cpu],pid) == 0)
+                                    if (strcmp(excedenCPU[cpuArr],pid) == 0)
                                     {
                                         corte=0;
                                     }
                                     else
                                     {
-                                        cpu++;
+                                        cpuArr++;
                                     }
                                 }
                                 if (corte == 1)
                                 {
-                                    strcpy(excedenCPU[cpu],pid);
+                                    strcpy(excedenCPU[cpuArr],pid);
                                     strcat(buffer,pid);
                                     strcat(buffer," ");
                                     strcat(buffer,command);
@@ -194,11 +197,13 @@ int main(int argc, char* argv[]){
                                     strcat(buffer," ");
                                     strcat(buffer,hora);
                                     strcat(buffer,"\n");
+                                    strcpy(excedenCPU[cpuArr+1]," ");
                                 }
                             }
                             if (memoriaInput > memoria)
                             {
                                 corte=1;
+                                mem=0;
                                 while (strcmp(excedenMemoria[mem]," ") != 0 && corte == 1)
                                 {
                                     if (strcmp(excedenMemoria[mem],pid) == 0)
@@ -221,11 +226,13 @@ int main(int argc, char* argv[]){
                                     strcat(buffer," ");
                                     strcat(buffer,hora);
                                     strcat(buffer,"\n");
+                                    strcpy(excedenMemoria[mem+1]," ");
                                 }
                             }
                         }
                     }
                 }
+                fclose(archivo);
                 strcat(buffer,"\0");
                 write(fileDescriptor,buffer,sizeof(buffer));
                 sleep(1);
@@ -243,8 +250,8 @@ int main(int argc, char* argv[]){
         }
         else
         { /* PRINCIPAL */
-            signal(SIGUSR1,&catchSignal);
             printf("\nLos procesos 'Principal', 'Control' y 'Registro' están ejecutando\nPara detenerlos mande la señal SIGUSR1 al proceso %d\n", getpid());
+            signal(SIGUSR1,&catchSignal);
             while (1 == 1){
             }
         }
