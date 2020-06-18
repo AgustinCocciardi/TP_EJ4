@@ -18,19 +18,29 @@ ps aux > procesos.txt\n\
 #define SHELLSCRIPT2 "\
 #/bin/bash \n\
 rm procesos.txt\n\
+rm /tmp/FIFOPRUEBA\n\
+"
+#define SHELLSCRIPT3 "\
+#/bin/bash \n\
+touch excesos.txt\n\
+rm excesos.txt\n\
 "
 
-int fileDescriptor;
+#define TAM 2000000
+
+pthread_mutex_t mutex;
+
 pid_t pid1, pid2;
 int status1, status2;
-FILE* resultado;
+pid_t ki1, ki2;
+
+FILE* excesos;
 
 void catchSignal(int signal){
-    close(fileDescriptor);
+    puts("Señal recibida");
     system(SHELLSCRIPT2);
-    waitpid(pid1, &status1, 0);
-    waitpid(pid2, &status2, 0);
-    fclose(resultado);
+    kill(ki1,SIGKILL);
+    kill(ki2,SIGKILL);
     exit(2);
 }
 
@@ -57,6 +67,8 @@ int main(int argc, char* argv[]){
         exit(1);
     }
 
+    system(SHELLSCRIPT3);
+
     float cpu= atof(argv[1]);
     float memoria= atof(argv[2]);
     float cpuInput;
@@ -70,192 +82,198 @@ int main(int argc, char* argv[]){
     strcpy(excedenCPU[0]," ");
     strcpy(excedenMemoria[0]," ");
 
-    char buffer[1000000];
-
-    mkfifo("tmp/fifo",0666);
-
-    resultado= fopen("excesos.txt","a");
-    if (resultado == NULL)
-    {
-        printf("\nSe ha producido un error\n");
-        exit(2);
-    }
-    
+    char* fifo= "/tmp/FIFOPRUEBA";
+    mkfifo(fifo,0666);
 
     if ( (pid1=fork()) == 0 )
-    { /* CONTROL */
-            fileDescriptor=open("tmp/fifo",O_WRONLY);
-            while (1 == 1){
-                system(SHELLSCRIPT);
-                FILE* archivo = fopen("procesos.txt","r");
-                if (archivo == NULL)
+    { /* Control */
+        while (1 == 1)
+        {
+            pthread_mutex_lock(&mutex);
+            char buffer[TAM];
+            system(SHELLSCRIPT);
+            FILE* archivo = fopen("procesos.txt","r");
+            if (archivo == NULL)
+            {
+                printf("\nNo se pudo extraer información de los Procesos en ejecucion\n");
+                exit(1);                
+            }
+            char delimitador[]=" \n";
+            char delimitadorN[]="\0";
+            char palabra[1100];
+            char *user;
+            char *pid;
+            char *cpuUso;
+            char *memUso;
+            char *vsz;
+            char *rss;
+            char *tty;
+            char *stat;
+            char *start;
+            char *tiempo;
+            char *command;
+
+            time_t t;
+            struct tm *tm;
+            char hora[100];
+
+            t=time(NULL);
+            tm=localtime(&t);
+            strftime(hora, 100, "%H:%M:%S", tm);
+
+            int amb=0;
+            int cpuArr=0;
+            int mem=0;
+            int corte;
+
+            while (feof(archivo) == 0)
+            {
+                fgets(palabra,1100,archivo);
+                if (strlen(palabra) > 30)
                 {
-                    printf("\nNo se pudo extraer información de los Procesos en ejecucion\n");
-                    exit(1);
-                }
-                char delimitador[]=" \n";
-                char delimitadorN[]="\0";
-                char palabra[1100];
-                char *user;
-                char *pid;
-                char *cpuUso;
-                char *memUso;
-                char *vsz;
-                char *rss;
-                char *tty;
-                char *stat;
-                char *start;
-                char *tiempo;
-                char *command;
-
-                time_t t;
-                struct tm *tm;
-                char hora[100];
-
-                t=time(NULL);
-                tm=localtime(&t);
-                strftime(hora, 100, "%H:%M:%S", tm);
-
-                int amb=0;
-                int cpuArr=0;
-                int mem=0;
-                int corte;
-
-                while (feof(archivo) == 0)
-                {
-                    fgets(palabra,1100,archivo);
-                    if (strlen(palabra) > 30)
+                    user= strtok(palabra,delimitador);
+                    pid= strtok(NULL,delimitador);
+                    cpuUso = strtok(NULL,delimitador);
+                    memUso = strtok(NULL, delimitador);
+                    vsz = strtok(NULL, delimitador);
+                    rss = strtok(NULL, delimitador);
+                    tty = strtok(NULL, delimitador);
+                    stat = strtok(NULL, delimitador);
+                    start = strtok(NULL, delimitador);
+                    tiempo = strtok(NULL, delimitador);
+                    command = strtok(NULL, delimitadorN);
+                    cpuInput= atof(cpuUso);
+                    memoriaInput = atof(memUso);
+                    if (cpuInput > cpu && memoriaInput > memoria)
                     {
-                        user= strtok(palabra,delimitador);
-                        pid= strtok(NULL,delimitador);
-                        cpuUso = strtok(NULL,delimitador);
-                        memUso = strtok(NULL, delimitador);
-                        vsz = strtok(NULL, delimitador);
-                        rss = strtok(NULL, delimitador);
-                        tty = strtok(NULL, delimitador);
-                        stat = strtok(NULL, delimitador);
-                        start = strtok(NULL, delimitador);
-                        tiempo = strtok(NULL, delimitador);
-                        command = strtok(NULL, delimitadorN);
-                        cpuInput= atof(cpuUso);
-                        memoriaInput = atof(memUso);
-                        if (cpuInput > cpu && memoriaInput > memoria)
+                        corte=1;
+                        amb=0;
+                        while (strcmp(excedenAmbos[amb]," ") != 0 && corte == 1)
                         {
-                            //printf("\nUser: %s PID: %s CPU: %s Memoria: %s Nombre: %s", user, pid, cpuUso, memUso, command);
-                            corte=1;
-                            amb=0;
-                            while (strcmp(excedenAmbos[amb]," ") != 0 && corte == 1)
+                            if (strcmp(excedenAmbos[amb],pid) == 0)
                             {
-                                if (strcmp(excedenAmbos[amb],pid) == 0)
+                                corte=0;
+                            }
+                            else
+                            {
+                                amb++;
+                            }
+                        }
+                        if (corte == 1)
+                        {
+                            strcpy(excedenAmbos[amb],pid);
+                            strcat(buffer,pid);
+                            strcat(buffer," ");
+                            strcat(buffer,command);
+                            strcat(buffer," ");
+                            strcat(buffer,"Ambos");
+                            strcat(buffer," ");
+                            strcat(buffer,hora);
+                            strcat(buffer,"\n");
+                            strcpy(excedenAmbos[amb+1]," ");
+                        }
+                    }
+                    else
+                    {
+                        if (cpuInput > cpu)
+                        {
+                            corte=1;
+                            cpuArr=0;
+                            while (strcmp(excedenCPU[cpuArr]," ") != 0 && corte == 1)
+                            {
+                                if (strcmp(excedenCPU[cpuArr],pid) == 0)
                                 {
                                     corte=0;
                                 }
                                 else
                                 {
-                                    amb++;
+                                    cpuArr++;
                                 }
                             }
                             if (corte == 1)
                             {
-                                strcpy(excedenAmbos[amb],pid);
+                                strcpy(excedenCPU[cpuArr],pid);
                                 strcat(buffer,pid);
                                 strcat(buffer," ");
                                 strcat(buffer,command);
                                 strcat(buffer," ");
-                                strcat(buffer,"Ambos");
+                                strcat(buffer,"CPU");
                                 strcat(buffer," ");
                                 strcat(buffer,hora);
                                 strcat(buffer,"\n");
-                                strcpy(excedenAmbos[amb+1]," ");
+                                strcpy(excedenCPU[cpuArr+1]," ");
                             }
                         }
-                        else
+                        if (memoriaInput > memoria)
                         {
-                            if (cpuInput > cpu)
+                            corte=1;
+                            mem=0;
+                            while (strcmp(excedenMemoria[mem]," ") != 0 && corte == 1)
                             {
-                                corte=1;
-                                cpuArr=0;
-                                while (strcmp(excedenCPU[cpuArr]," ") != 0 && corte == 1)
+                                if (strcmp(excedenMemoria[mem],pid) == 0)
                                 {
-                                    if (strcmp(excedenCPU[cpuArr],pid) == 0)
-                                    {
-                                        corte=0;
-                                    }
-                                    else
-                                    {
-                                        cpuArr++;
-                                    }
+                                    corte=0;
                                 }
-                                if (corte == 1)
+                                else
                                 {
-                                    strcpy(excedenCPU[cpuArr],pid);
-                                    strcat(buffer,pid);
-                                    strcat(buffer," ");
-                                    strcat(buffer,command);
-                                    strcat(buffer," ");
-                                    strcat(buffer,"CPU");
-                                    strcat(buffer," ");
-                                    strcat(buffer,hora);
-                                    strcat(buffer,"\n");
-                                    strcpy(excedenCPU[cpuArr+1]," ");
+                                    mem++;
                                 }
                             }
-                            if (memoriaInput > memoria)
+                            if (corte == 1)
                             {
-                                corte=1;
-                                mem=0;
-                                while (strcmp(excedenMemoria[mem]," ") != 0 && corte == 1)
-                                {
-                                    if (strcmp(excedenMemoria[mem],pid) == 0)
-                                    {
-                                        corte=0;
-                                    }
-                                    else
-                                    {
-                                        mem++;
-                                    }
-                                }
-                                if (corte == 1)
-                                {
-                                    strcpy(excedenMemoria[mem],pid);
-                                    strcat(buffer,pid);
-                                    strcat(buffer," ");
-                                    strcat(buffer,command);
-                                    strcat(buffer," ");
-                                    strcat(buffer,"Memoria");
-                                    strcat(buffer," ");
-                                    strcat(buffer,hora);
-                                    strcat(buffer,"\n");
-                                    strcpy(excedenMemoria[mem+1]," ");
-                                }
+                                strcpy(excedenMemoria[mem],pid);
+                                strcat(buffer,pid);
+                                strcat(buffer," ");
+                                strcat(buffer,command);
+                                strcat(buffer," ");
+                                strcat(buffer,"Memoria");
+                                strcat(buffer," ");
+                                strcat(buffer,hora);
+                                strcat(buffer,"\n");
+                                strcpy(excedenMemoria[mem+1]," ");
                             }
                         }
                     }
                 }
-                fclose(archivo);
-                strcat(buffer,"\0");
-                write(fileDescriptor,buffer,sizeof(buffer));
-                sleep(1);
             }
+            fclose(archivo);
+            strcat(buffer,"\0");
+            int fileDescriptor=open(fifo,O_WRONLY);
+            write(fileDescriptor,buffer,sizeof(buffer));
+            close(fileDescriptor);
+            pthread_mutex_unlock(&mutex);
+            usleep(1000000);
+        }
     }
     else
-    { /*  PRINCIPAL */
+    { /*  Principal */
         if ( (pid2=fork()) == 0 )
-        { /* REGISTRO  */
-            fileDescriptor=open("tmp/fifo",O_RDONLY);
-            while (1 == 1){
+        { /* Registro  */
+            while (1 == 1)
+            {
+                pthread_mutex_lock(&mutex);
+                char buffer[TAM];
+                int fileDescriptor = open(fifo,O_RDONLY);
                 read(fileDescriptor,buffer,sizeof(buffer));
-                fwrite(buffer,sizeof(char),sizeof(buffer),resultado);
+                excesos= fopen("excesos.txt","a");
+                fwrite(buffer,sizeof(char),sizeof(buffer),excesos);
+                fclose(excesos);
+                close(fileDescriptor);
+                pthread_mutex_unlock(&mutex);
+                usleep(1000000);
             }
         }
         else
-        { /* PRINCIPAL */
-            printf("\nLos procesos 'Principal', 'Control' y 'Registro' están ejecutando\nPara detenerlos mande la señal SIGUSR1 al proceso %d\n", getpid());
+        { /* Principal */
+            printf("Los procesos Principal, Control y Registro están corriendo.\nPara matarlos, mande la señal SIGUSR1 al proceso %d: 'kill -10 %d'\n", getpid(),getpid());
             signal(SIGUSR1,&catchSignal);
-            while (1 == 1){
+            while (1 == 1)
+            {
+                waitpid(pid1,&status1,0);
+                waitpid(pid2,&status2,0);
             }
         }
     }
- 
+
     return 0;
 }
