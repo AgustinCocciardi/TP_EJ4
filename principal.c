@@ -44,6 +44,8 @@ void catchSignal(int signal){
     exit(2);
 }
 
+int buscarLetra(const char* cadena, char letra);
+
 int main(int argc, char* argv[]){
     char *ayuda="-Help"; //Uso esta cadena para ver si el usuario quiere ver la ayuda
     if (argc == 2 && strcmp(argv[1],ayuda) == 0) //Muestro la ayuda al usuario
@@ -68,6 +70,35 @@ int main(int argc, char* argv[]){
     }
 
     system(SHELLSCRIPT3);
+
+    char validador[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-,?!";
+    int corteCPU=1;
+    int corteMEM=1;
+    int i=0, j=0;
+    while (corteCPU == 1 && i< strlen(validador))
+    {
+        if (buscarLetra(argv[1],validador[i]) == 1)
+        {
+            corteCPU = 0;
+        }
+        i++;
+    }
+
+    while (corteMEM == 1 && j< strlen(validador))
+    {
+        if (buscarLetra(argv[2],validador[j]) == 1)
+        {
+            corteMEM = 0;
+        }
+        j++;
+    }
+
+    if (corteCPU == 0 || corteMEM == 0)
+    {
+        puts("Debe pasar valores numericos positivos como parametros");
+        puts("Ejecute './Principal -Help' sin las comillas para obtener ayuda");
+        exit(4);
+    }
 
     float cpu= atof(argv[1]);
     float memoria= atof(argv[2]);
@@ -276,5 +307,16 @@ int main(int argc, char* argv[]){
         }
     }
 
+    return 0;
+}
+
+int buscarLetra(const char* cadena, char letra){
+    for (int i = 0; i < strlen(cadena); i++)
+    {
+        if (cadena[i] == letra)
+        {
+            return 1;
+        }
+    }
     return 0;
 }
