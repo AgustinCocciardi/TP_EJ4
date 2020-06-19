@@ -142,6 +142,7 @@ int main(int argc, char* argv[]){
                     start = strtok(NULL, delimitador);
                     tiempo = strtok(NULL, delimitador);
                     command = strtok(NULL, delimitadorN);
+                    command[strlen(command)-1]=' ';
                     cpuInput= atof(cpuUso);
                     memoriaInput = atof(memUso);
                     if (cpuInput > cpu && memoriaInput > memoria)
