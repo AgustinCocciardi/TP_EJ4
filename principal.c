@@ -298,11 +298,22 @@ int main(int argc, char* argv[]){
                 char buffer[TAM];
                 int fileDescriptor = open(fifo,O_RDONLY);
                 read(fileDescriptor,buffer,sizeof(buffer));
-                printf("Tam Buffer: %ld\t Long Buffer: %ld\n", sizeof(buffer),strlen(buffer));
+                //printf("Tam Buffer: %ld\t Long Buffer: %ld\n", sizeof(buffer),strlen(buffer));
+                char grabar[strlen(buffer)];
+                for (int i = 0; i < strlen(buffer); i++)
+                {
+                    grabar[i]=buffer[i];
+                }
+                //printf("Grabar esto: %s %ld\n", grabar, strlen(grabar));
+                //printf("Tam Grabar: %ld\t Long Grabar: %ld\n", sizeof(grabar),strlen(grabar));
                 excesos= fopen("excesos.txt","a");
-                fwrite(buffer,sizeof(char),sizeof(buffer),excesos);
+                if (strlen(grabar) >= 46 )
+                {
+                    fwrite(grabar,sizeof(char),sizeof(grabar),excesos);
+                }
                 fclose(excesos);
                 close(fileDescriptor);
+                strcpy(grabar," ");
                 pthread_mutex_unlock(&mutex);
                 usleep(1000000);
             }
