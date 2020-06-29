@@ -26,6 +26,13 @@ touch excesos.txt\n\
 rm excesos.txt\n\
 "
 
+int excedenAmbos[200];
+int excedenCPU[200];
+int excedenMemoria[200];
+int tamam=0;
+int tamCPU=0;
+int tamMem=0;
+
 #define TAM 2000000
 
 pthread_mutex_t mutex;
@@ -105,16 +112,12 @@ int main(int argc, char* argv[]){
     float cpuInput;
     float memoriaInput;
 
-    char excedenAmbos[200][6];
-    char excedenCPU[200][6];
-    char excedenMemoria[200][6];
-
-    strcpy(excedenAmbos[0]," ");
-    strcpy(excedenCPU[0]," ");
-    strcpy(excedenMemoria[0]," ");
-
     char* fifo= "/tmp/FIFOPRUEBA";
     mkfifo(fifo,0666);
+
+    excedenAmbos[0]=0;
+    excedenCPU[0]=0;
+    excedenMemoria[0]=0;
 
     if ( (pid1=fork()) == 0 )
     { /* Control */
@@ -122,6 +125,7 @@ int main(int argc, char* argv[]){
         {
             pthread_mutex_lock(&mutex);
             char buffer[TAM];
+            //printf("Peso del buffer: %ld B %ld KB  %ld MB\n", pesoBuffer, pesoBuffer/1024, pesoBuffer/(1024*1024));
             system(SHELLSCRIPT);
             FILE* archivo = fopen("procesos.txt","r");
             if (archivo == NULL)
@@ -156,6 +160,7 @@ int main(int argc, char* argv[]){
             int cpuArr=0;
             int mem=0;
             int corte;
+            int thePid;
 
             while (feof(archivo) == 0)
             {
@@ -176,24 +181,28 @@ int main(int argc, char* argv[]){
                     command[strlen(command)-1]=' ';
                     cpuInput= atof(cpuUso);
                     memoriaInput = atof(memUso);
+                    thePid=atoi(pid);
                     if (cpuInput > cpu && memoriaInput > memoria)
                     {
                         corte=1;
                         amb=0;
-                        while (strcmp(excedenAmbos[amb]," ") != 0 && corte == 1)
+                        while (amb <= tamam && corte == 1)
                         {
-                            if (strcmp(excedenAmbos[amb],pid) == 0)
-                            {
-                                corte=0;
+                            if(excedenAmbos[amb] == thePid){
+                                corte = 0;
+                                //printf("El proceso %d ya está en la lista AMBOS\n", thePid);
+                                  //  sleep(1);
                             }
                             else
                             {
                                 amb++;
                             }
+                            
                         }
                         if (corte == 1)
                         {
-                            strcpy(excedenAmbos[amb],pid);
+                            excedenAmbos[amb]=thePid;
+                            tamam++;
                             strcat(buffer,pid);
                             strcat(buffer," ");
                             strcat(buffer,command);
@@ -202,7 +211,6 @@ int main(int argc, char* argv[]){
                             strcat(buffer," ");
                             strcat(buffer,hora);
                             strcat(buffer,"\n");
-                            strcpy(excedenAmbos[amb+1]," ");
                         }
                     }
                     else
@@ -211,11 +219,12 @@ int main(int argc, char* argv[]){
                         {
                             corte=1;
                             cpuArr=0;
-                            while (strcmp(excedenCPU[cpuArr]," ") != 0 && corte == 1)
+                            while (cpuArr <= tamCPU && corte == 1)
                             {
-                                if (strcmp(excedenCPU[cpuArr],pid) == 0)
-                                {
-                                    corte=0;
+                                if(excedenCPU[cpuArr] == thePid){
+                                    corte = 0;
+                                    //printf("El proceso %d ya está en la lista CPU\n", thePid);
+                                    //sleep(1);
                                 }
                                 else
                                 {
@@ -224,7 +233,8 @@ int main(int argc, char* argv[]){
                             }
                             if (corte == 1)
                             {
-                                strcpy(excedenCPU[cpuArr],pid);
+                                excedenCPU[cpuArr]=thePid;
+                                tamCPU++;
                                 strcat(buffer,pid);
                                 strcat(buffer," ");
                                 strcat(buffer,command);
@@ -233,18 +243,18 @@ int main(int argc, char* argv[]){
                                 strcat(buffer," ");
                                 strcat(buffer,hora);
                                 strcat(buffer,"\n");
-                                strcpy(excedenCPU[cpuArr+1]," ");
                             }
                         }
                         if (memoriaInput > memoria)
                         {
                             corte=1;
                             mem=0;
-                            while (strcmp(excedenMemoria[mem]," ") != 0 && corte == 1)
+                            while (mem <= tamMem && corte == 1)
                             {
-                                if (strcmp(excedenMemoria[mem],pid) == 0)
-                                {
-                                    corte=0;
+                                if(excedenMemoria[mem] == thePid){
+                                    corte = 0;
+                                    //printf("El proceso %d ya está en la lista MEMORIA\n", thePid);
+                                    //sleep(1);
                                 }
                                 else
                                 {
@@ -253,7 +263,8 @@ int main(int argc, char* argv[]){
                             }
                             if (corte == 1)
                             {
-                                strcpy(excedenMemoria[mem],pid);
+                                excedenMemoria[mem]=thePid;
+                                tamMem++;
                                 strcat(buffer,pid);
                                 strcat(buffer," ");
                                 strcat(buffer,command);
@@ -262,7 +273,6 @@ int main(int argc, char* argv[]){
                                 strcat(buffer," ");
                                 strcat(buffer,hora);
                                 strcat(buffer,"\n");
-                                strcpy(excedenMemoria[mem+1]," ");
                             }
                         }
                     }
@@ -273,6 +283,7 @@ int main(int argc, char* argv[]){
             int fileDescriptor=open(fifo,O_WRONLY);
             write(fileDescriptor,buffer,sizeof(buffer));
             close(fileDescriptor);
+            strcpy(buffer," ");
             pthread_mutex_unlock(&mutex);
             usleep(1000000);
         }
@@ -287,6 +298,7 @@ int main(int argc, char* argv[]){
                 char buffer[TAM];
                 int fileDescriptor = open(fifo,O_RDONLY);
                 read(fileDescriptor,buffer,sizeof(buffer));
+                printf("Tam Buffer: %ld\t Long Buffer: %ld\n", sizeof(buffer),strlen(buffer));
                 excesos= fopen("excesos.txt","a");
                 fwrite(buffer,sizeof(char),sizeof(buffer),excesos);
                 fclose(excesos);
