@@ -130,7 +130,7 @@ int main(int argc, char* argv[]){
             FILE* archivo = fopen("procesos.txt","r");
             if (archivo == NULL)
             {
-                printf("\nNo se pudo extraer información de los Procesos en ejecucion\n");
+                //printf("\nNo se pudo extraer información de los Procesos en ejecucion\n");
                 exit(1);                
             }
             char delimitador[]=" \n";
