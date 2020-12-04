@@ -37,14 +37,22 @@ int tamMem=0;
 
 pthread_mutex_t mutex;
 
-pid_t pid1, pid2;
-int status1, status2;
-pid_t ki1, ki2;
+pid_t pid1, pid2, pid3;
+int status1, status2, status3;
+pid_t ki1, ki2, ki3;
 
 FILE* excesos;
 
 void catchSignal(int signal){
-    puts("Señal recibida");
+    //puts("Señal recibida");
+    /*FILE* fich;
+    fich= fopen("excesos.txt","r");
+    fseek(fich,0L,SEEK_END);
+    if (ftell(fich) == 0)
+    {
+        puts("El archivo 'excesos.txt' se ha creado vacío porque no hubo procesos que superaran los valores límite pasados por parámetro\nIntente pasar valores más pequeños");
+    }
+    fclose(fich);*/
     system(SHELLSCRIPT2);
     kill(ki1,SIGKILL);
     kill(ki2,SIGKILL);
@@ -119,215 +127,294 @@ int main(int argc, char* argv[]){
     excedenCPU[0]=0;
     excedenMemoria[0]=0;
 
-    if ( (pid1=fork()) == 0 )
-    { /* Control */
-        while (1 == 1)
-        {
-            pthread_mutex_lock(&mutex);
-            char buffer[TAM];
-            //printf("Peso del buffer: %ld B %ld KB  %ld MB\n", pesoBuffer, pesoBuffer/1024, pesoBuffer/(1024*1024));
-            system(SHELLSCRIPT);
-            FILE* archivo = fopen("procesos.txt","r");
-            if (archivo == NULL)
-            {
-                //printf("\nNo se pudo extraer información de los Procesos en ejecucion\n");
-                exit(1);                
-            }
-            char delimitador[]=" \n";
-            char delimitadorN[]="\0";
-            char palabra[1100];
-            char *user;
-            char *pid;
-            char *cpuUso;
-            char *memUso;
-            char *vsz;
-            char *rss;
-            char *tty;
-            char *stat;
-            char *start;
-            char *tiempo;
-            char *command;
-
-            time_t t;
-            struct tm *tm;
-            char hora[100];
-
-            t=time(NULL);
-            tm=localtime(&t);
-            strftime(hora, 100, "%H:%M:%S", tm);
-
-            int amb=0;
-            int cpuArr=0;
-            int mem=0;
-            int corte;
-            int thePid;
-
-            while (feof(archivo) == 0)
-            {
-                fgets(palabra,1100,archivo);
-                if (strlen(palabra) > 30)
-                {
-                    user= strtok(palabra,delimitador);
-                    pid= strtok(NULL,delimitador);
-                    cpuUso = strtok(NULL,delimitador);
-                    memUso = strtok(NULL, delimitador);
-                    vsz = strtok(NULL, delimitador);
-                    rss = strtok(NULL, delimitador);
-                    tty = strtok(NULL, delimitador);
-                    stat = strtok(NULL, delimitador);
-                    start = strtok(NULL, delimitador);
-                    tiempo = strtok(NULL, delimitador);
-                    command = strtok(NULL, delimitadorN);
-                    command[strlen(command)-1]=' ';
-                    cpuInput= atof(cpuUso);
-                    memoriaInput = atof(memUso);
-                    thePid=atoi(pid);
-                    if (cpuInput > cpu && memoriaInput > memoria)
-                    {
-                        corte=1;
-                        amb=0;
-                        while (amb <= tamam && corte == 1)
-                        {
-                            if(excedenAmbos[amb] == thePid){
-                                corte = 0;
-                                //printf("El proceso %d ya está en la lista AMBOS\n", thePid);
-                                  //  sleep(1);
-                            }
-                            else
-                            {
-                                amb++;
-                            }
-                            
-                        }
-                        if (corte == 1)
-                        {
-                            excedenAmbos[amb]=thePid;
-                            tamam++;
-                            strcat(buffer,pid);
-                            strcat(buffer," ");
-                            strcat(buffer,command);
-                            strcat(buffer," ");
-                            strcat(buffer,"Ambos");
-                            strcat(buffer," ");
-                            strcat(buffer,hora);
-                            strcat(buffer,"\n");
-                        }
-                    }
-                    else
-                    {
-                        if (cpuInput > cpu)
-                        {
-                            corte=1;
-                            cpuArr=0;
-                            while (cpuArr <= tamCPU && corte == 1)
-                            {
-                                if(excedenCPU[cpuArr] == thePid){
-                                    corte = 0;
-                                    //printf("El proceso %d ya está en la lista CPU\n", thePid);
-                                    //sleep(1);
-                                }
-                                else
-                                {
-                                    cpuArr++;
-                                }
-                            }
-                            if (corte == 1)
-                            {
-                                excedenCPU[cpuArr]=thePid;
-                                tamCPU++;
-                                strcat(buffer,pid);
-                                strcat(buffer," ");
-                                strcat(buffer,command);
-                                strcat(buffer," ");
-                                strcat(buffer,"CPU");
-                                strcat(buffer," ");
-                                strcat(buffer,hora);
-                                strcat(buffer,"\n");
-                            }
-                        }
-                        if (memoriaInput > memoria)
-                        {
-                            corte=1;
-                            mem=0;
-                            while (mem <= tamMem && corte == 1)
-                            {
-                                if(excedenMemoria[mem] == thePid){
-                                    corte = 0;
-                                    //printf("El proceso %d ya está en la lista MEMORIA\n", thePid);
-                                    //sleep(1);
-                                }
-                                else
-                                {
-                                    mem++;
-                                }
-                            }
-                            if (corte == 1)
-                            {
-                                excedenMemoria[mem]=thePid;
-                                tamMem++;
-                                strcat(buffer,pid);
-                                strcat(buffer," ");
-                                strcat(buffer,command);
-                                strcat(buffer," ");
-                                strcat(buffer,"Memoria");
-                                strcat(buffer," ");
-                                strcat(buffer,hora);
-                                strcat(buffer,"\n");
-                            }
-                        }
-                    }
-                }
-            }
-            fclose(archivo);
-            strcat(buffer,"\0");
-            int fileDescriptor=open(fifo,O_WRONLY);
-            write(fileDescriptor,buffer,sizeof(buffer));
-            close(fileDescriptor);
-            strcpy(buffer," ");
-            pthread_mutex_unlock(&mutex);
-            usleep(1000000);
-        }
-    }
-    else
-    { /*  Principal */
-        if ( (pid2=fork()) == 0 )
-        { /* Registro  */
+    if ((pid3=fork()) == 0)
+    {
+            if ( (pid1=fork()) == 0 )
+        { 
+            /* Control */
             while (1 == 1)
             {
                 pthread_mutex_lock(&mutex);
                 char buffer[TAM];
-                int fileDescriptor = open(fifo,O_RDONLY);
-                read(fileDescriptor,buffer,sizeof(buffer));
-                //printf("Tam Buffer: %ld\t Long Buffer: %ld\n", sizeof(buffer),strlen(buffer));
-                char grabar[strlen(buffer)];
-                for (int i = 0; i < strlen(buffer); i++)
+                //printf("Peso del buffer: %ld B %ld KB  %ld MB\n", pesoBuffer, pesoBuffer/1024, pesoBuffer/(1024*1024));
+                system(SHELLSCRIPT);
+                FILE* archivo = fopen("procesos.txt","r");
+                if (archivo == NULL)
                 {
-                    grabar[i]=buffer[i];
+                    //printf("\nNo se pudo extraer información de los Procesos en ejecucion\n");
+                    exit(1);                
                 }
-                //printf("Grabar esto: %s %ld\n", grabar, strlen(grabar));
-                //printf("Tam Grabar: %ld\t Long Grabar: %ld\n", sizeof(grabar),strlen(grabar));
-                excesos= fopen("excesos.txt","a");
-                if (strlen(grabar) >= 46 )
+                char delimitador[]=" \n";
+                char delimitadorN[]="\0";
+                char palabra[1100];
+                char *user;
+                char *pid;
+                char *cpuUso;
+                char *memUso;
+                char *vsz;
+                char *rss;
+                char *tty;
+                char *stat;
+                char *start;
+                char *tiempo;
+                char *command;
+
+                time_t t;
+                struct tm *tm;
+                char hora[100];
+
+                t=time(NULL);
+                tm=localtime(&t);
+                strftime(hora, 100, "%H:%M:%S", tm);
+
+                int amb=0;
+                int cpuArr=0;
+                int mem=0;
+                int corte;
+                int thePid;
+                int ocupaAmbos;
+                int superoCPU;
+                int superoMEM;
+
+                while (feof(archivo) == 0)
                 {
-                    fwrite(grabar,sizeof(char),sizeof(grabar),excesos);
+                    fgets(palabra,1100,archivo);
+                    if (strlen(palabra) > 30)
+                    {
+                        user= strtok(palabra,delimitador);
+                        pid= strtok(NULL,delimitador);
+                        cpuUso = strtok(NULL,delimitador);
+                        memUso = strtok(NULL, delimitador);
+                        vsz = strtok(NULL, delimitador);
+                        rss = strtok(NULL, delimitador);
+                        tty = strtok(NULL, delimitador);
+                        stat = strtok(NULL, delimitador);
+                        start = strtok(NULL, delimitador);
+                        tiempo = strtok(NULL, delimitador);
+                        command = strtok(NULL, delimitadorN);
+                        command[strlen(command)-1]=' ';
+                        cpuInput= atof(cpuUso);
+                        memoriaInput = atof(memUso);
+                        thePid=atoi(pid);
+                        if (cpuInput > cpu && memoriaInput > memoria)
+                        {
+                            corte=1;
+                            amb=0;
+                            cpuArr=0;
+                            mem=0;
+                            ocupaAmbos=0;
+                            while(cpuArr <= tamCPU){
+                                if(excedenCPU[cpuArr] == thePid){
+                                    ocupaAmbos++;
+                                }
+                                cpuArr++;
+                            }
+                            while(mem <= tamMem){
+                                if(excedenMemoria[mem] == thePid){
+                                    ocupaAmbos++;
+                                }
+                                mem++;
+                            }
+                            while (amb <= tamam && corte == 1)
+                            {
+                                if(excedenAmbos[amb] == thePid){
+                                    corte = 0;
+                                    //printf("El proceso %d ya está en la lista AMBOS\n", thePid);
+                                    //  sleep(1);
+                                }
+                                else
+                                {
+                                    amb++;
+                                }
+                                
+                            }
+                            if (corte == 1 && ocupaAmbos < 2)
+                            {
+                                excedenAmbos[amb]=thePid;
+                                tamam++;
+                                strcat(buffer,pid);
+                                strcat(buffer," ");
+                                strcat(buffer,command);
+                                strcat(buffer," ");
+                                strcat(buffer,"Ambos");
+                                strcat(buffer," ");
+                                strcat(buffer,hora);
+                                strcat(buffer,"\n");
+                            }
+                        }
+                        else
+                        {
+                            if (cpuInput > cpu)
+                            {
+                                corte=1;
+                                cpuArr=0;
+                                amb=0;
+                                superoMEM=0;
+                                mem=0;
+                                while (amb <= tamam && corte == 1)
+                                {
+                                    if(excedenAmbos[amb] == thePid){
+                                        corte = 0;
+                                        //printf("El proceso %d ya está en la lista AMBOS\n", thePid);
+                                        //  sleep(1);
+                                    }
+                                    else
+                                    {
+                                        amb++;
+                                    }
+                                }
+                                while (cpuArr <= tamCPU && corte == 1)
+                                {
+                                    if(excedenCPU[cpuArr] == thePid){
+                                        corte = 0;
+                                        //printf("El proceso %d ya está en la lista CPU\n", thePid);
+                                        //sleep(1);
+                                    }
+                                    else
+                                    {
+                                        cpuArr++;
+                                    }
+                                }
+                                while(mem <= tamMem){
+                                    if(excedenMemoria[mem] == thePid){
+                                        superoMEM=1;
+                                    }
+                                    mem++;
+                                }
+                                if (corte == 1)
+                                {
+                                    excedenCPU[cpuArr]=thePid;
+                                    tamCPU++;
+                                    strcat(buffer,pid);
+                                    strcat(buffer," ");
+                                    strcat(buffer,command);
+                                    strcat(buffer," ");
+                                    if(superoMEM == 0){
+                                        strcat(buffer,"CPU");
+                                    }
+                                    else{
+                                        strcat(buffer,"Ambos");
+                                    }
+                                    strcat(buffer," ");
+                                    strcat(buffer,hora);
+                                    strcat(buffer,"\n");
+                                }
+                            }
+                            if (memoriaInput > memoria)
+                            {
+                                corte=1;
+                                mem=0;
+                                amb=0;
+                                superoCPU=0;
+                                cpuArr=0;
+                                while (amb <= tamam && corte == 1)
+                                {
+                                    if(excedenAmbos[amb] == thePid){
+                                        corte = 0;
+                                        //printf("El proceso %d ya está en la lista AMBOS\n", thePid);
+                                        //  sleep(1);
+                                    }
+                                    else
+                                    {
+                                        amb++;
+                                    }
+                                    
+                                }
+                                while (mem <= tamMem && corte == 1)
+                                {
+                                    if(excedenMemoria[mem] == thePid){
+                                        corte = 0;
+                                        //printf("El proceso %d ya está en la lista MEMORIA\n", thePid);
+                                        //sleep(1);
+                                    }
+                                    else
+                                    {
+                                        mem++;
+                                    }
+                                }
+                                while(cpuArr <= tamCPU){
+                                    if(excedenCPU[cpuArr] == thePid){
+                                        superoCPU=1;
+                                    }
+                                    cpuArr++;
+                                }
+                                if (corte == 1)
+                                {
+                                    excedenMemoria[mem]=thePid;
+                                    tamMem++;
+                                    strcat(buffer,pid);
+                                    strcat(buffer," ");
+                                    strcat(buffer,command);
+                                    strcat(buffer," ");
+                                    if(superoCPU == 0){
+                                        strcat(buffer,"Memoria");
+                                    }
+                                    else{
+                                        strcat(buffer,"Ambos");
+                                    }
+                                    strcat(buffer," ");
+                                    strcat(buffer,hora);
+                                    strcat(buffer,"\n");
+                                }
+                            }
+                        }
+                    }
                 }
-                fclose(excesos);
+                fclose(archivo);
+                strcat(buffer,"\0");
+                int fileDescriptor=open(fifo,O_WRONLY);
+                write(fileDescriptor,buffer,sizeof(buffer));
                 close(fileDescriptor);
-                strcpy(grabar," ");
+                strcpy(buffer," ");
                 pthread_mutex_unlock(&mutex);
                 usleep(1000000);
             }
         }
         else
-        { /* Principal */
-            printf("Los procesos Principal, Control y Registro están corriendo.\nPara matarlos, mande la señal SIGUSR1 al proceso %d: 'kill -10 %d'\n", getpid(),getpid());
-            signal(SIGUSR1,&catchSignal);
-            while (1 == 1)
-            {
-                waitpid(pid1,&status1,0);
-                waitpid(pid2,&status2,0);
+        { /*  Principal */
+            if ( (pid2=fork()) == 0 )
+            { /* Registro  */
+                while (1 == 1)
+                {
+                    pthread_mutex_lock(&mutex);
+                    char buffer[TAM];
+                    int fileDescriptor = open(fifo,O_RDONLY);
+                    read(fileDescriptor,buffer,sizeof(buffer));
+                    //printf("Tam Buffer: %ld\t Long Buffer: %ld\n", sizeof(buffer),strlen(buffer));
+                    char grabar[strlen(buffer)];
+                    for (int i = 0; i < strlen(buffer); i++)
+                    {
+                        grabar[i]=buffer[i];
+                    }
+                    //printf("Recibi esto: %s %ld\n", grabar, strlen(grabar));
+                    //printf("Tam Grabar: %ld\t Long Grabar: %ld\n", sizeof(grabar),strlen(grabar));
+                    excesos= fopen("excesos.txt","a");
+                    if (strlen(grabar) >= 4 )
+                    {
+                        //printf("Grabar esto: %s %ld\n", grabar, strlen(grabar));
+                        fwrite(grabar,sizeof(char),sizeof(grabar),excesos);
+                    }
+                    fclose(excesos);
+                    close(fileDescriptor);
+                    strcpy(grabar," ");
+                    pthread_mutex_unlock(&mutex);
+                    usleep(1000000);
+                }
+            }
+            else
+            { /* Principal */
+                signal(SIGUSR1,&catchSignal);
+                while (1 == 1)
+                {
+                    waitpid(pid1,&status1,0);
+                    waitpid(pid2,&status2,0);
+                }
             }
         }
+    }
+    else
+    {
+        printf("Los procesos Principal, Control y Registro están corriendo.\nPara matarlos, mande la señal SIGUSR1 al proceso %d: 'kill -10 %d'\n", pid3,pid3);
     }
 
     return 0;
